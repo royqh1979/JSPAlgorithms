@@ -1,3 +1,4 @@
+#include <jsp.h>
 //
 // Created by roy on 2019/5/20.
 //
@@ -8,18 +9,13 @@
 
 using namespace std;
 
-JobManagerClass::JobManagerClass(ifstream dataFileStream) {
-    string line;
-    while( getline(dataFileStream,line)) {
-        if (line.find("#") != 0) {
-            break;
-        }
+JSPManagerClass::JSPManagerClass(int job_count,int machine_count):_job_count(job_count),_machine_count(machine_count) {
+    for (int i=0;i<job_count;i++) {
+        createJob();
     }
-    if (dataFileStream.eof()) {
-        return;
+    for (int i=0;i<machine_count;i++) {
+        createMachine();
     }
-    dataFileStream>>
-
 }
 OperationManagerClass OperationManager;
 JobManagerClass JobManager;

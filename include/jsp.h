@@ -13,6 +13,7 @@
 #include <fstream>
 
 class JSPManagerClass;
+class Job;
 
 class Operation {
 private:
@@ -20,14 +21,26 @@ private:
     int _job_id;
     int _machine_id;
     double _duration;
-    Operation(int id,int job_id,int machine_id,double duration):
-        _id(id),_job_id(job_id),_machine_id(machine_id),_duration(duration){}
+    int _index_in_job=0;
+//    int _index_in_machine=0;
+    Operation(int id,int job_id,int machine_id, double duration):
+        _id(id),_job_id(job_id),_machine_id(machine_id),_duration(duration){
+    }
+    void set_index_in_job(int index_in_job) {
+        _index_in_job = index_in_job;
+    }
 public:
     const int& id() const {return _id; }
     const int& job_id() const {return _job_id;}
     const int& machine_id() const { return _machine_id;}
     const double& duration() const {return _duration;}
+    const int& index_in_job() const {return _index_in_job;}
+//    const int& index_in_machine() const {return _index_in_job;}
+//    void set_index_in_machine(int index_in_machine) {
+//        _index_in_machine = index_in_machine;
+//    }
     friend class JSPManagerClass;
+    friend class Job;
 };
 
 struct Operation_hash{
@@ -44,34 +57,47 @@ class Job{
 private:
     std::vector<Operation> _operations{};
     int _id;
-    int addOperation(Operation op) {
+    int addOperation(Operation& op) {
+        int index_in_job = _operations.size();
+        op.set_index_in_job(index_in_job);
         _operations.push_back(op);
     }
-
-public:
     Job(int id): _id(id) {}
+public:
 
     const Operation& getOperation(int i) const {
         return _operations[i];
-    }
-
-    const int& getOperationPosition(Operation op) const {
-        auto pos = std::find(_operations.cbegin(),_operations.cend(),op);
-        if (pos == _operations.cend()){
-            return -1;
-        } else {
-            return pos -_operations.cbegin();
-        }
     }
 
     const int& operationCount() const {
         return _operations.size();
     }
 
-    const int id() const{
+    const int& id() const{
         return _id;
     }
 
+    friend class JSPManagerClass;
+};
+
+class Machine{
+private:
+    std::unordered_set<int> _operations{};
+    int _id;
+    Machine(int id): _id(id){
+
+    }
+    void addOperation(const Operation& op) {
+        _operations.insert(op.id());
+    }
+public:
+    bool is_operation_in_machine(int id) const {
+        return _operations.find(id)!=_operations.end();
+    }
+
+    const int& id() const{
+        return _id;
+    }
     friend class JSPManagerClass;
 };
 
@@ -81,94 +107,49 @@ private:
     int _job_count{0};
     int _machine_count{0};
     std::vector<Job> _jobs{};
-    int _operation_counts{0};
-public:
-    JSPManagerClass(int job_count,int machine_count):_job_count(job_count),_machine_count(machine_count) {}
-
-    Job& addJob(){
+    std::vector<Machine> _machines{};
+    std::vector<Operation*> _operations{0};
+    void createJob(){
         int id=_jobs.size();
         _jobs.push_back(Job{id});
-        return _jobs.back();
+    }
+    void createMachine() {
+        int id=_machines.size();
+        _machines.push_back(Machine{id});
+    }
+public:
+    JSPManagerClass(int job_count,int machine_count);
+
+    const Job& getJob(int id) const{
+        return _jobs[id];
     }
 
-    Job& getJob(int id) {
-        return _jobs[id-1];
+    const Machine& getMachine(int id) const {
+        return _machines[id];
     }
 
     Operation& addOperation(int job_id,int machine_id,double duration) {
-        int id = _operation_counts++;
+        if (machine_id>=_machine_count) {
+            throw std::length_error{"wrong machine number!"};
+        }
+        int id = _operations.size();
         Operation op{id,job_id,machine_id,duration};
-        getJob(job_id).addOperation(op);
+        _jobs[job_id].addOperation(op);
+        _operations.push_back(&op);
         return op;
     }
 
-    Job& getOperation(int job_id, int id){
-
+    const Operation& getOperation(int i, int j) const{
+        return _jobs[i].getOperation(j);
     }
 
+    const
 
-
+    const Operation& getOperation(int id) const {
+        return *(_operations[id]);
+    }
 
 };
-
-/**
- * Operation管理器
- */
-class OperationManagerClass {
-private:
-    std::vector<Operation> _operations{};
-
-public:
-    /**
-     * 创建一个新的operation
-     * @param job_id job的id
-     * @param machine_id machine的id
-     * @param time 操作时间
-     * @return operation的id
-     */
-    const Operation& addOperation(int job_id, int machine_id, float time) {
-        int id = _operations.size();
-        _operations.push_back(Operation{id,job_id,machine_id,time});
-        return _operations.back();
-    }
-
-    int count() const {
-        return _operations.size();
-    }
-
-    const Operation& getOperation(int id) const{
-        return _operations[id];
-    }
-};
-
-
-
-extern OperationManagerClass OperationManager;
-
-
-class JobManagerClass{
-private:
-    std::vector<Job> _jobs{};
-public:
-    JobManagerClass(){}
-
-    JobManagerClass(std::ifstream dataFileStream);
-
-    Job& addJob() {
-        int id=_jobs.size();
-        _jobs.push_back(Job(id));
-        return _jobs.back();
-    }
-
-    Job& getJob(int id) {
-        return _jobs[id];
-    }
-};
-
-
-
-extern JobManagerClass JobManager;
-
 
 
 #endif //JSPALGORITHMS_JSP_H
