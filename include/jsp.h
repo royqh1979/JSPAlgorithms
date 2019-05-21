@@ -11,6 +11,7 @@
 #include <memory>
 #include <algorithm>
 #include <fstream>
+#include <iostream>
 
 class JSPManagerClass;
 class Job;
@@ -30,11 +31,11 @@ private:
         _index_in_job = index_in_job;
     }
 public:
-    const int& id() const {return _id; }
-    const int& job_id() const {return _job_id;}
-    const int& machine_id() const { return _machine_id;}
-    const double& duration() const {return _duration;}
-    const int& index_in_job() const {return _index_in_job;}
+    int id() const {return _id; }
+    int job_id() const {return _job_id;}
+    int machine_id() const { return _machine_id;}
+    double duration() const {return _duration;}
+    int index_in_job() const {return _index_in_job;}
 //    const int& index_in_machine() const {return _index_in_job;}
 //    void set_index_in_machine(int index_in_machine) {
 //        _index_in_machine = index_in_machine;
@@ -49,32 +50,40 @@ struct Operation_hash{
     }
 };
 
-bool operator==(const Operation& first, const Operation& second){
+inline bool operator==(const Operation& first, const Operation& second){
     return first.id() == second.id();
 }
 
+using POperation = std::shared_ptr<Operation>;
 class Job{
 private:
-    std::vector<Operation> _operations{};
+    std::vector<POperation> _operations{};
     int _id;
-    int addOperation(Operation& op) {
+    void add_operation(POperation pop) {
         int index_in_job = _operations.size();
-        op.set_index_in_job(index_in_job);
-        _operations.push_back(op);
+        pop->set_index_in_job(index_in_job);
+        _operations.push_back(pop);
     }
     Job(int id): _id(id) {}
 public:
 
-    const Operation& getOperation(int i) const {
+    const POperation get_operation(int i) const {
         return _operations[i];
     }
 
-    const int& operationCount() const {
+    int operation_count() const {
         return _operations.size();
     }
 
-    const int& id() const{
+    int id() const{
         return _id;
+    }
+
+    ~Job() {
+        for (auto pop:_operations) {
+            pop.reset();
+        }
+        _operations.clear();
     }
 
     friend class JSPManagerClass;
@@ -87,7 +96,7 @@ private:
     Machine(int id): _id(id){
 
     }
-    void addOperation(const Operation& op) {
+    void add_operation(const Operation &op) {
         _operations.insert(op.id());
     }
 public:
@@ -95,8 +104,17 @@ public:
         return _operations.find(id)!=_operations.end();
     }
 
-    const int& id() const{
+    int operation_count() const {
+        return _operations.size();
+    }
+
+
+    int id() const{
         return _id;
+    }
+
+    ~Machine(){
+        _operations.clear();
     }
     friend class JSPManagerClass;
 };
@@ -108,45 +126,71 @@ private:
     int _machine_count{0};
     std::vector<Job> _jobs{};
     std::vector<Machine> _machines{};
-    std::vector<Operation*> _operations{0};
-    void createJob(){
+    std::vector<POperation> _operations{};
+    void create_job(){
         int id=_jobs.size();
         _jobs.push_back(Job{id});
     }
-    void createMachine() {
+    void create_machine() {
         int id=_machines.size();
         _machines.push_back(Machine{id});
     }
 public:
     JSPManagerClass(int job_count,int machine_count);
 
-    const Job& getJob(int id) const{
+    JSPManagerClass(std::string jsp_data_filename);
+
+    const Job& get_job(int id) const{
         return _jobs[id];
     }
 
-    const Machine& getMachine(int id) const {
+    const Machine& get_machine(int id) const {
         return _machines[id];
     }
 
-    Operation& addOperation(int job_id,int machine_id,double duration) {
+    POperation add_operation(int job_id, int machine_id, double duration) {
         if (machine_id>=_machine_count) {
             throw std::length_error{"wrong machine number!"};
         }
         int id = _operations.size();
-        Operation op{id,job_id,machine_id,duration};
-        _jobs[job_id].addOperation(op);
-        _operations.push_back(&op);
+        POperation op(new Operation(id,job_id,machine_id,duration));
+        _operations.push_back(op);
+        _jobs[job_id].add_operation(op);
+
         return op;
     }
 
-    const Operation& getOperation(int i, int j) const{
-        return _jobs[i].getOperation(j);
+    const POperation get_operation(int i, int j) const{
+        return _jobs[i].get_operation(j);
     }
 
-    const
+    int job_count() const {
+        return _job_count;
+    }
 
-    const Operation& getOperation(int id) const {
-        return *(_operations[id]);
+    int operation_count() const {
+        return _operations.size();
+    }
+
+    int operation_count_in_job(int id) const {
+        return get_job(id).operation_count();
+    }
+
+    int machine_count() const {
+        return _machine_count;
+    }
+
+    const POperation get_operation(int id) const {
+        return _operations[id];
+    }
+
+    ~JSPManagerClass(){
+        for (auto pop:_operations) {
+            pop.reset();
+        }
+        _operations.clear();
+        _jobs.clear();
+        _machines.clear();
     }
 
 };

@@ -4,6 +4,7 @@ project(JSPAlgorithms)
 set(CMAKE_CXX_STANDARD 17)
 
 #set(EIGEN3_INCLUDE_DIR "d:/Program Files/libs/eigen")
+set(BOOST_ROOT "D:/Program Files/boost_1_70_0")
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 # message(STATUS "Project: ${PROJECT_NAME}")
@@ -14,6 +15,14 @@ include_directories(include)
 
 AUX_SOURCE_DIRECTORY(src DIR_SRCS)
 
+find_package(boost)
+if (Boost_FOUND)
+    include_directories(${Boost_INCLUDE_DIR})
+else(Boost_FOUND)
+    message(FATAL_ERROR "Boost not found!")
+endif(Boost_FOUND)
+
+
 #find_package(Eigen3 REQUIRED)
 #if (EIGEN3_FOUND)
 #    message(STATUS "Found Eigen3:\"${EIGEN3_INCLUDE_DIR}\",ENABLE_EIGEN3 Macro is enabled!")
@@ -21,5 +30,5 @@ AUX_SOURCE_DIRECTORY(src DIR_SRCS)
 #    add_definitions(-DENABLE_EIGEN3)
 #endif (EIGEN3_FOUND)
 
-add_executable(taboo_search include/jsp.h src/taboo_search.cpp src/jsp.cpp)
+add_executable(test_read_data include/jsp.h src/test_read_data.cpp src/jsp.cpp)
 #add_executable(eigen_test src/eigen_test.cpp)
