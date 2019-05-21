@@ -12,21 +12,103 @@
 #include <algorithm>
 #include <fstream>
 
-class OperationManagerClass;
+class JSPManagerClass;
 
 class Operation {
 private:
     int _id;
     int _job_id;
     int _machine_id;
-    double _time;
-    Operation(int id,int job_id,int machine_id,double time):
-        _id(id),_job_id(job_id),_machine_id(machine_id),_time(time){}
+    double _duration;
+    Operation(int id,int job_id,int machine_id,double duration):
+        _id(id),_job_id(job_id),_machine_id(machine_id),_duration(duration){}
 public:
-    int id() const {return _id; }
-    int job_id() const {return _job_id;}
-    int machine_id() const { return _machine_id;}
-    friend class OperationManagerClass;
+    const int& id() const {return _id; }
+    const int& job_id() const {return _job_id;}
+    const int& machine_id() const { return _machine_id;}
+    const double& duration() const {return _duration;}
+    friend class JSPManagerClass;
+};
+
+struct Operation_hash{
+    size_t operator()(const Operation& op) const {
+        return std::hash<int>()(op.id());
+    }
+};
+
+bool operator==(const Operation& first, const Operation& second){
+    return first.id() == second.id();
+}
+
+class Job{
+private:
+    std::vector<Operation> _operations{};
+    int _id;
+    int addOperation(Operation op) {
+        _operations.push_back(op);
+    }
+
+public:
+    Job(int id): _id(id) {}
+
+    const Operation& getOperation(int i) const {
+        return _operations[i];
+    }
+
+    const int& getOperationPosition(Operation op) const {
+        auto pos = std::find(_operations.cbegin(),_operations.cend(),op);
+        if (pos == _operations.cend()){
+            return -1;
+        } else {
+            return pos -_operations.cbegin();
+        }
+    }
+
+    const int& operationCount() const {
+        return _operations.size();
+    }
+
+    const int id() const{
+        return _id;
+    }
+
+    friend class JSPManagerClass;
+};
+
+
+class JSPManagerClass {
+private:
+    int _job_count{0};
+    int _machine_count{0};
+    std::vector<Job> _jobs{};
+    int _operation_counts{0};
+public:
+    JSPManagerClass(int job_count,int machine_count):_job_count(job_count),_machine_count(machine_count) {}
+
+    Job& addJob(){
+        int id=_jobs.size();
+        _jobs.push_back(Job{id});
+        return _jobs.back();
+    }
+
+    Job& getJob(int id) {
+        return _jobs[id-1];
+    }
+
+    Operation& addOperation(int job_id,int machine_id,double duration) {
+        int id = _operation_counts++;
+        Operation op{id,job_id,machine_id,duration};
+        getJob(job_id).addOperation(op);
+        return op;
+    }
+
+    Job& getOperation(int job_id, int id){
+
+    }
+
+
+
+
 };
 
 /**
@@ -59,50 +141,10 @@ public:
     }
 };
 
-struct Operation_hash{
-    size_t operator()(const Operation& op) const {
-        return std::hash<int>()(op.id());
-    }
-};
 
-bool operator==(const Operation& first, const Operation& second){
-    return first.id() == second.id();
-}
 
 extern OperationManagerClass OperationManager;
 
-class Job{
-private:
-    std::vector<Operation> _operations;
-    int _id;
-public:
-    Job(int id): _id(id) {}
-    int addOperation(Operation op) {
-        _operations.push_back(op);
-    }
-
-    const Operation& getOperation(int i) const {
-        return _operations[i];
-    }
-
-    const int getOperationPosition(Operation op) const {
-        auto pos = std::find(_operations.cbegin(),_operations.cend(),op);
-        if (pos == _operations.cend()){
-            return -1;
-        } else {
-            return pos -_operations.cbegin();
-        }
-    }
-
-    int operationCount() const {
-        return _operations.size();
-    }
-
-    const int id() const{
-        return _id;
-    }
-
-};
 
 class JobManagerClass{
 private:
