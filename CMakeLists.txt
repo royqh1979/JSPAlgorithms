@@ -4,7 +4,7 @@ project(JSPAlgorithms)
 set(CMAKE_CXX_STANDARD 17)
 
 #set(EIGEN3_INCLUDE_DIR "d:/Program Files/libs/eigen")
-set(BOOST_ROOT "D:/Program Files/boost_1_70_0")
+#set(BOOST_ROOT "D:/Program Files/boost_1_70_0")
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 # message(STATUS "Project: ${PROJECT_NAME}")
@@ -15,13 +15,15 @@ include_directories(include)
 
 AUX_SOURCE_DIRECTORY(src DIR_SRCS)
 
-find_package(boost)
+find_package(boost REQUIRED)
 if (Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIR})
 else(Boost_FOUND)
     message(FATAL_ERROR "Boost not found!")
 endif(Boost_FOUND)
 
+find_package(PkgConfig REQUIRED)
+pkg_search_module(Graphviz REQUIRED libgvc)
 
 #find_package(Eigen3 REQUIRED)
 #if (EIGEN3_FOUND)
@@ -30,5 +32,14 @@ endif(Boost_FOUND)
 #    add_definitions(-DENABLE_EIGEN3)
 #endif (EIGEN3_FOUND)
 
+# 打开vector下标越界检测
+SET(CMAKE_CXX_FLAGS "-D_GLIBCXX_CONCEPT_CHECKS -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC")
+SET(CMAKE_CXX_FLAGS "-D_DEBUG")
+# SET(CMAKE_EXE_LINKER_FLAGS "-D_GLIBCXX_CONCEPT_CHECKS -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC")
+
+
 add_executable(test_read_data include/jsp.h src/test_read_data.cpp src/jsp.cpp)
+target_link_libraries(test_read_data ${Graphviz_LIBRARIES})
+target_include_directories(test_read_data PUBLIC ${Graphviz_INCLUDE_DIRS})
+target_compile_options(test_read_data PUBLIC ${Graphviz_CFLAGS_OTHER})
 #add_executable(eigen_test src/eigen_test.cpp)

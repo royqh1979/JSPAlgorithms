@@ -10,18 +10,12 @@
 using namespace std;
 
 int main() {
-    JSPManagerClass jspManager("e:/abz5.txt");
+    JSPManager jspManager("e:/abz5.txt");
 
-    for (int i=0;i<jspManager.job_count();i++) {
-        cout<<"Job "<<i<<endl;
-        for (int j=0;j<jspManager.operation_count_in_job(i);j++) {
-            const POperation op= jspManager.get_operation(i,j);
-            cout<<"("<<op->id()<<","<<op->job_id()<<","<<op->machine_id()<<","<<op->duration()<<")";
-        }
-        cout<<endl;
-    }
+   // jspManager.print_jobs();
+   // jspManager.print_machines();
 
-
+    JSPGraph graph(jspManager);
     return 0;
 }
 
