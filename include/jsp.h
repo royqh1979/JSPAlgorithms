@@ -13,7 +13,7 @@
 #include <fstream>
 #include <iostream>
 
-class JSPManager;
+class JSPProblem;
 class Job;
 
 
@@ -85,10 +85,14 @@ public:
 //    void set_index_in_machine(int index_in_machine) {
 //        _index_in_machine = index_in_machine;
 //    }
-    friend class JSPManager;
+    friend class JSPProblem;
     friend class Job;
 };
 
+/**
+ * Hash function object for the Operation class
+ * Used in hashset/hashmap
+ */
 struct Operation_hash{
     size_t operator()(const Operation& op) const {
         return std::hash<int>()(op.id());
@@ -99,8 +103,15 @@ inline bool operator==(const Operation& first, const Operation& second){
     return first.id() == second.id();
 }
 
+/**
+ * Pointer to the Operaction class
+ */
 using POperation = std::shared_ptr<Operation>;
 
+/**
+ * Hash function object for the POperation class
+ * Used in hashset/hashmap
+ */
 struct POperation_hash{
     size_t operator()(const POperation& op) const {
         return std::hash<int>()(op->id());
@@ -113,90 +124,192 @@ inline bool operator==(const POperation& first, const POperation& second){
 
 using POperationSet = std::unordered_set<POperation, POperation_hash>;
 
+/**
+ * The Job class
+ * A job is composed of several operations.
+ */
 class Job{
 private:
     std::vector<POperation> _operations{};
     int _id;
+    /**
+     * Add an operation to the job and make it the last operation of the job.
+     * @param pop
+     */
     void add_operation(POperation& pop) {
         int index_in_job = _operations.size();
         pop->set_index_in_job(index_in_job);
         _operations.push_back(pop);
     }
-    Job(int id): _id(id) {}
+    /**
+     * The constructor.
+     *
+     * @param id the id of the job.
+     */
+    explicit Job(int id): _id(id) {}
 public:
 
-    const POperation& get_operation(int i) const {
-        return _operations[i];
+    /**
+     * Get a pointer to the operation with the specifed index_in_job in the job.
+     *
+     * The operation is the (index_in_job+1)th operation in the job.
+     * So if the operation is the 5th in the job, its index_in_job should be 4.
+     *
+     * @param index_in_job the index_in_job value of the operation
+     * @return pointer to the specified operation
+     */
+    const POperation& get_operation(int index_in_job) const {
+        return _operations[index_in_job];
     }
 
+    /**
+     * Get count of the operations in the job.
+     *
+     * @return
+     */
     int operation_count() const {
         return _operations.size();
     }
 
+    /**
+     * Get the id of the job.
+     *
+     * @return
+     */
     int id() const{
         return _id;
     }
 
-    friend class JSPManager;
+    friend class JSPProblem;
 };
 
+/**
+ * The Machine class
+ */
 class Machine{
 private:
     POperationSet  _operations{};
     int _id;
-    Machine(int id): _id(id){
-
-    }
+    /**
+     * The constructor
+     *
+     * @param id the id of the machine.
+     */
+    explicit Machine(int id): _id(id){  }
+    /**
+     * Add a operation to the machine, which means that the operation must be processed on this machine.
+     * @param op
+     */
     void add_operation(const POperation &op) {
         _operations.insert(op);
     }
 public:
-
+    /**
+     * Get count of the operations.
+     *
+     * @return
+     */
     int operation_count() const {
         return _operations.size();
     }
 
+    /**
+     * Get all operations must be proccessed on this machine.
+     *
+     * @return
+     */
     const POperationSet& opertions() const {
         return _operations;
     }
 
+    /**
+     * Get id of the machine
+     * @return
+     */
     int id() const{
         return _id;
     }
 
 
-    friend class JSPManager;
+    friend class JSPProblem;
 };
 
-
-class JSPManager {
+/**
+ * The JSP problem class
+ * Each jsp problem is corresponding to one JspProblem object.
+ * It contains all the informations of the problem, such as jobs, operations and machines.
+ */
+class JSPProblem {
 private:
     int _job_count{0};
     int _machine_count{0};
     std::vector<Job> _jobs{};
     std::vector<Machine> _machines{};
     std::vector<POperation> _operations{};
-    void create_job(){
+
+    /**
+     * Create a new job
+     *
+     * @return the new job object
+     */
+    Job& create_job(){
         int id=_jobs.size();
         _jobs.push_back(Job{id});
+        return _jobs.back();
     }
-    void create_machine() {
+
+    /**
+     * Create a new machine
+     * @return the new machine object
+     */
+    Machine& create_machine() {
         int id=_machines.size();
         _machines.push_back(Machine{id});
+        return _machines.back();
     }
 public:
-    JSPManager(int job_count,int machine_count);
+    /**
+     * The constructor
+     *
+     * @param job_count total counts of jobs
+     * @param machine_count total counts of machines
+     */
+    JSPProblem(int job_count,int machine_count);
 
-    JSPManager(std::string jsp_data_filename);
+    /**
+     * Read the data file and construct the corresponding jsp problem
+     *
+     * @param jsp_data_filename the data file name
+     */
+    explicit JSPProblem(const std::string& jsp_data_filename);
 
+    /**
+     * Get the job with the specified id
+     *
+     * @param id the jobs'id
+     * @return the job
+     */
     const Job& get_job(int id) const{
         return _jobs[id];
     }
 
+    /**
+     * Get the machine with the specified id
+     * @param id the machine's id
+     * @return the machine
+     */
     const Machine& get_machine(int id) const {
         return _machines[id];
     }
 
+    /**
+     * Add an operation
+     *
+     * @param job_id id of the job to which the operation belongs
+     * @param machine_id id of the machine that the operation is processed on
+     * @param duration the processing time of the operation
+     * @return
+     */
     POperation add_operation(int job_id, int machine_id, double duration) {
         if (machine_id>=_machine_count) {
             throw std::length_error{"wrong machine number!"};
@@ -210,83 +323,211 @@ public:
         return op;
     }
 
-    const POperation& get_operation(int i, int j) const{
-        return _jobs[i].get_operation(j);
+    /**
+     * Get the pointer to the specified operation
+     *
+     * @param job_id id of the job to which the operation belongs
+     * @param index_in_job the operation's index in the job (@see Job::get_operation)
+     * @return the pointer of the specified operation
+     */
+    const POperation& get_operation(int job_id, int index_in_job) const{
+        return _jobs[job_id].get_operation(index_in_job);
     }
 
+    /**
+     * Get total count of the jobs
+     *
+     * @return
+     */
     int job_count() const {
         return _job_count;
     }
 
+    /**
+     * Get total count of the operations
+     *
+     * @return
+     */
     int operation_count() const {
         return _operations.size();
     }
 
-    int operation_count_in_job(int id) const {
-        return get_job(id).operation_count();
+    /**
+     * get count of the operations in the specified job
+     *
+     * @param job_id id of the job to which the operations belong
+     * @return
+     */
+    int operation_count_in_job(int job_id) const {
+        return get_job(job_id).operation_count();
     }
 
+    /**
+     * Get total count of the machines.
+     *
+     * @return
+     */
     int machine_count() const {
         return _machine_count;
     }
 
+    /**
+     * Get pointer to the operation
+     * @param id id of the operation
+     * @return
+     */
     const POperation& get_operation(int id) const {
         return _operations[id];
     }
 
+    /**
+     * Print jobs info to stdin
+     */
     void print_jobs() const;
+
+    /**
+     * Print machines info to stdin
+     */
     void print_machines() const;
 };
 
+/**
+ * Node of the JSP search graph
+ */
 struct JSPGraphNode {
     int id;
     POperation pop;
-    std::unordered_set<int> precedents;
+    double duration=0;
+    double earliest_start_time=0;
+    double earliest_end_time=0;
+    double latest_start_time=0;
+    double latest_end_time=0;
+    std::unordered_set<int> ancestors{}; // a node's ancestors. That is, the nodes that directly and indirectly precede this node;
+    std::unordered_set<int> precedences{}; //nodes that directly precede this node ;
+    std::unordered_set<int> successors{}; //nodes that directly succeed this node ;
 };
 
 using PJSPGraphNode = std::shared_ptr<JSPGraphNode>;
 
-using JSPGraphNodeSet = std::unordered_set<int>;
 
-using MachineOperationOrder = std::vector<int>;
+using OperationOrdersInMachine = std::vector<int>;
 
-class JSPGraph{
+/**
+ * JSP Search Graph
+ */
+class JSPSearchGraph{
 private:
-    const JSPManager& _manager;
+    PJSPGraphNode _start_node; //Start Node of the search graph
+    PJSPGraphNode _end_node; //End Node of the search graph
+    const JSPProblem& _problem;
     std::vector<PJSPGraphNode> _nodes{};
-
-    std::vector<JSPGraphNodeSet> _succeeds_list{}; // remember each vertice's succeedings ( record prev ->next)
-    std::vector<JSPGraphNodeSet> _previous_list{};  // remember each vertice's previous ( record next->prev)
-    std::vector<MachineOperationOrder> _machine_operation_orders{};
-
+    std::vector<OperationOrdersInMachine> _machine_operation_orders{};
     std::vector<int> _operation_node_ids; // aux list to remember operation's corresponding node id
 
+    /**
+     * Create a new operation node
+     *
+     * @param pop pointer to the node's corresponding operation
+     * @return the created node
+     */
     PJSPGraphNode create_node(const POperation& pop) {
         int id = _nodes.size();
-        PJSPGraphNode node(new JSPGraphNode());
-        node->id = id;
-        node->pop = pop;
-        node->precedents = std::unordered_set<int>{};
+        PJSPGraphNode node(new JSPGraphNode{id,pop});
+        if (pop!= nullptr) {
+            node->duration = pop->duration();
+        }
         _nodes.push_back(node);
         return node;
     }
 public:
-    const static PJSPGraphNode START_NODE;
-    const static PJSPGraphNode END_NODE;
 
-    JSPGraph(const JSPManager& manager);
+    /**
+     * Construct the search graph
+     *
+     * @param problem the JSP problem of the search graph
+     */
+    explicit JSPSearchGraph(const JSPProblem& problem);
 
-    const JSPManager& manager() const {
-        return _manager;
+    /**
+     * Get the JSP problem
+     * @return
+     */
+    const JSPProblem& problem() const {
+        return _problem;
     }
 
-    void add_vertice(int prev_id, int next_id) {
-        _succeeds_list[prev_id].insert(next_id);
-        _previous_list[next_id].insert(prev_id);
+    /**
+     * test if we can connect a node to another node (and not form a circle in the graph)
+     *
+     *
+     * @param prev the precedent node
+     * @param next the succedent node
+     * @return true if can connect without a circle, false if can't
+     */
+    bool can_connect(const PJSPGraphNode& prev, const PJSPGraphNode& next) {
+        return prev->ancestors.find(next->id)==prev->ancestors.end();
     }
 
+    /**
+     * test if we can connect a node to another node (and not form a circle in the graph)
+     *
+     *
+     * @param prev_id the precedent node's id
+     * @param next_id the succedent node's id
+     * @return true if can connect without a circle, false if can't
+     */
+    bool can_connect(int prev_id, int next_id) {
+        return can_connect(_nodes[prev_id],_nodes[next_id]);
+    }
+
+    /**
+     * Add a vertice to the search graph
+     *
+     * @param prev the precedent node
+     * @param next the succedent node
+     */
     void add_vertice(const PJSPGraphNode& prev, const PJSPGraphNode& next) {
-        add_vertice(prev->id,next->id);
+#ifdef _DEBUG
+        if (!can_connect(prev,next)){
+            char buf[100];
+            std::sprintf(buf,"Can't connect a node(%d) to it's ancestor!(%d)",prev->id,next->id);
+            throw std::logic_error(buf);
+        }
+#endif
+
+        prev->successors.insert(next->id);
+        next->precedences.insert(prev->id);
+        next->ancestors.insert(prev->id);
+        next->ancestors.insert(prev->ancestors.begin(),prev->ancestors.end());
+    }
+
+    /**
+     * Add a vertice to the search graph
+     *
+     * @param prev_id the precedent node's id
+     * @param next_id the succedent node's id
+     */
+    void add_vertice(int prev_id, int next_id) {
+        add_vertice(_nodes[prev_id],_nodes[next_id]);
+    }
+
+    /**
+     * Remove a vertice from the graph
+     *
+     * @param prev the precedent node
+     * @param next the succedent node*
+     */
+    void remove_vertice(const PJSPGraphNode& prev, const PJSPGraphNode& next) {
+        prev->successors.erase(next->id);
+        next->precedences.erase(prev->id);
+        // recalculate ancestors
+        next->ancestors.clear();
+        for (int pre_id: next->precedences) {
+            PJSPGraphNode  pre=_nodes[pre_id];
+            next->ancestors.insert(pre->id);
+            next->ancestors.insert(pre->ancestors.begin(),pre->ancestors.end());
+        }
+
     }
 
     /**
@@ -294,17 +535,16 @@ public:
      *
      * @param filename the file to drawn
      */
-    void generate_image(const char* filename) const;
+    void generate_image(const std::string& filename) const;
 
     /**
-     * Draw the graph to the specified image file
-     *
-     * @param filename the file to drawn
+     * Recalcuate the start/finish time of nodes
      */
-    void generate_image(const std::string& filename) const {
-        generate_image(filename.c_str());
-    }
+    void recalculate_earliest_times();
 
+    double shortest_time() {
+        return _end_node->earliest_end_time;
+    }
 };
 
 

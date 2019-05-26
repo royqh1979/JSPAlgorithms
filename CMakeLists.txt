@@ -37,9 +37,11 @@ SET(CMAKE_CXX_FLAGS "-D_GLIBCXX_CONCEPT_CHECKS -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG
 SET(CMAKE_CXX_FLAGS "-D_DEBUG")
 # SET(CMAKE_EXE_LINKER_FLAGS "-D_GLIBCXX_CONCEPT_CHECKS -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC")
 
+add_library(jsp STATIC src/jsp.cpp)
+target_link_libraries(jsp ${Graphviz_LIBRARIES})
+target_include_directories(jsp PUBLIC ${Graphviz_INCLUDE_DIRS})
+# target_compile_options(jsp ${Graphviz_CFLAGS_OTHER})
 
-add_executable(test_read_data include/jsp.h src/test_read_data.cpp src/jsp.cpp)
-target_link_libraries(test_read_data ${Graphviz_LIBRARIES})
-target_include_directories(test_read_data PUBLIC ${Graphviz_INCLUDE_DIRS})
-target_compile_options(test_read_data PUBLIC ${Graphviz_CFLAGS_OTHER})
+add_executable(test_read_data src/test_read_data.cpp )
+target_link_libraries(test_read_data jsp)
 #add_executable(eigen_test src/eigen_test.cpp)

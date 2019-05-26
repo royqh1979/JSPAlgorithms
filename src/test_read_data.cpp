@@ -10,12 +10,19 @@
 using namespace std;
 
 int main() {
-    JSPManager jspManager("e:/abz5.txt");
+    JSPProblem problem("e:/abz5.txt");
 
-   // jspManager.print_jobs();
-   // jspManager.print_machines();
+   // problem.print_jobs();
+   // problem.print_machines();
 
-    JSPGraph graph(jspManager);
+    JSPSearchGraph graph(problem);
+
+    graph.generate_image("f:/test.png");
+
+    graph.recalculate_earliest_times();
+    graph.generate_image("f:/test2.png");
+
+    cout<<graph.shortest_time()<<endl;
     return 0;
 }
 
