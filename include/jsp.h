@@ -520,6 +520,10 @@ public:
         _machine_operation_orders[node->machine_id].push_back(node->id);
     }
 
+    const std::unordered_set<int>& start_nodes() const {
+        return _start_nodes;
+    }
+
     /**
      * generate a solution using greedy algorithms
      */
