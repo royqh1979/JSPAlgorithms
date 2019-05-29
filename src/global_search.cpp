@@ -10,20 +10,22 @@
 using namespace std;
 
 int main() {
+    // optimum 655
     JSPProblem problem("e:/la02.txt");
 
-   // problem.print_jobs();
-   // problem.print_machines();
+    problem.print_jobs();
+    problem.print_machines();
 
     JSPSearchGraph graph(problem);
 
-    graph.generate_greedy_solution();
     graph.generate_image("f:/test.png");
 
     graph.recalculate_earliest_times();
     graph.generate_image("f:/test2.png");
 
-    cout<<graph.shortest_time()<<endl;
+    int short_time=graph.shortest_time();
+
+
     return 0;
 }
 

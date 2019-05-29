@@ -29,7 +29,7 @@ private:
     int _id;
     int _job_id;
     int _machine_id;
-    double _duration;
+    int _duration;
     int _index_in_job=0;
 //    int _index_in_machine=0;
     /**
@@ -40,7 +40,7 @@ private:
      * @param machine_id the id of the machine that processed the operation.
      * @param duration the processing time of the operation
      */
-    Operation(int id,int job_id,int machine_id, double duration):
+    Operation(int id,int job_id,int machine_id, int duration):
         _id(id),_job_id(job_id),_machine_id(machine_id),_duration(duration){
     }
 
@@ -75,7 +75,7 @@ public:
      * Get the processing time of the operation
      * @return
      */
-    double duration() const {return _duration;}
+    int duration() const {return _duration;}
     /**
      * Get the operation's index in the job
      * @return
@@ -310,7 +310,7 @@ public:
      * @param duration the processing time of the operation
      * @return
      */
-    POperation add_operation(int job_id, int machine_id, double duration) {
+    POperation add_operation(int job_id, int machine_id, int duration) {
         if (machine_id>=_machine_count) {
             throw std::length_error{"wrong machine number!"};
         }
@@ -396,15 +396,15 @@ public:
  */
 struct JSPGraphNode {
     int id;
-    POperation pop;
-    double duration=0;
-    double earliest_start_time=0;
-    double earliest_end_time=0;
-    double latest_start_time=0;
-    double latest_end_time=0;
-    std::unordered_set<int> ancestors{}; // a node's ancestors. That is, the nodes that directly and indirectly precede this node;
-    std::unordered_set<int> precedences{}; //nodes that directly precede this node ;
-    std::unordered_set<int> successors{}; //nodes that directly succeed this node ;
+    int job_id;
+    int machine_id;
+    int index_in_job;
+    int index_in_machine;
+    int duration;
+    int earliest_start_time=0;
+    int earliest_end_time=0;
+    int latest_start_time=0;
+    int latest_end_time=0;
 };
 
 using PJSPGraphNode = std::shared_ptr<JSPGraphNode>;
@@ -417,13 +417,13 @@ using OperationOrdersInMachine = std::vector<int>;
  */
 class JSPSearchGraph{
 private:
-    PJSPGraphNode _start_node; //Start Node of the search graph
-    PJSPGraphNode _end_node; //End Node of the search graph
     const JSPProblem& _problem;
     std::vector<PJSPGraphNode> _nodes{};
-    std::vector<OperationOrdersInMachine> _machine_operation_orders{};
-    std::vector<int> _operation_node_ids; // aux list to remember operation's corresponding node id
+    std::unordered_set<int> _start_nodes{};
+    std::unordered_set<int> _end_nodes{};
+    int last_node_time = 0;
 
+    std::vector<OperationOrdersInMachine> _machine_operation_orders{};
     /**
      * Create a new operation node
      *
@@ -432,10 +432,12 @@ private:
      */
     PJSPGraphNode create_node(const POperation& pop) {
         int id = _nodes.size();
-        PJSPGraphNode node(new JSPGraphNode{id,pop});
-        if (pop!= nullptr) {
-            node->duration = pop->duration();
+        PJSPGraphNode node(new JSPGraphNode{id,pop->job_id(),pop->machine_id(),pop->index_in_job(),-1,pop->duration()});
+#ifdef _DEBUG
+        if (node->id!=pop->id()) {
+            throw std::runtime_error("Operation id is not equal to graph node id!");
         }
+#endif
         _nodes.push_back(node);
         return node;
     }
@@ -457,78 +459,71 @@ public:
     }
 
     /**
-     * test if we can connect a node to another node (and not form a circle in the graph)
+     * Get the precedant job operation node id
      *
-     *
-     * @param prev the precedent node
-     * @param next the succedent node
-     * @return true if can connect without a circle, false if can't
+     * @param node
+     * @return
      */
-    bool can_connect(const PJSPGraphNode& prev, const PJSPGraphNode& next) {
-        return prev->ancestors.find(next->id)==prev->ancestors.end();
-    }
-
-    /**
-     * test if we can connect a node to another node (and not form a circle in the graph)
-     *
-     *
-     * @param prev_id the precedent node's id
-     * @param next_id the succedent node's id
-     * @return true if can connect without a circle, false if can't
-     */
-    bool can_connect(int prev_id, int next_id) {
-        return can_connect(_nodes[prev_id],_nodes[next_id]);
-    }
-
-    /**
-     * Add a vertice to the search graph
-     *
-     * @param prev the precedent node
-     * @param next the succedent node
-     */
-    void add_vertice(const PJSPGraphNode& prev, const PJSPGraphNode& next) {
-#ifdef _DEBUG
-        if (!can_connect(prev,next)){
-            char buf[100];
-            std::sprintf(buf,"Can't connect a node(%d) to it's ancestor!(%d)",prev->id,next->id);
-            throw std::logic_error(buf);
+    int get_prev_in_job(const PJSPGraphNode& node) const {
+        if (node->index_in_job==0) {
+            return -1;
         }
-#endif
-
-        prev->successors.insert(next->id);
-        next->precedences.insert(prev->id);
-        next->ancestors.insert(prev->id);
-        next->ancestors.insert(prev->ancestors.begin(),prev->ancestors.end());
+        return problem().get_job(node->job_id).get_operation(node->index_in_job-1)->id();
     }
 
-    /**
-     * Add a vertice to the search graph
-     *
-     * @param prev_id the precedent node's id
-     * @param next_id the succedent node's id
-     */
-    void add_vertice(int prev_id, int next_id) {
-        add_vertice(_nodes[prev_id],_nodes[next_id]);
-    }
-
-    /**
-     * Remove a vertice from the graph
-     *
-     * @param prev the precedent node
-     * @param next the succedent node*
-     */
-    void remove_vertice(const PJSPGraphNode& prev, const PJSPGraphNode& next) {
-        prev->successors.erase(next->id);
-        next->precedences.erase(prev->id);
-        // recalculate ancestors
-        next->ancestors.clear();
-        for (int pre_id: next->precedences) {
-            PJSPGraphNode  pre=_nodes[pre_id];
-            next->ancestors.insert(pre->id);
-            next->ancestors.insert(pre->ancestors.begin(),pre->ancestors.end());
+    int get_prev_in_machine(const PJSPGraphNode& node) const {
+        if (node->index_in_machine==-1) {
+            return -2;
         }
-
+        if (node->index_in_machine==0) {
+            return -1;
+        }
+        return _machine_operation_orders[node->machine_id][node->index_in_machine-1];
     }
+
+    int get_next_in_job(const PJSPGraphNode& node) const {
+        if (node->index_in_job == problem().get_job(node->job_id).operation_count()-1) {
+            return -1;
+        }
+        return problem().get_job(node->job_id).get_operation(node->index_in_job+1)->id();
+    }
+
+    int get_next_in_machine(const PJSPGraphNode& node) const {
+        if (node->index_in_machine==-1) {
+            return -2;
+        }
+        if (node->index_in_machine==problem().get_machine(node->machine_id).operation_count()-1) {
+            return -1;
+        }
+        return _machine_operation_orders[node->machine_id][node->index_in_machine+1];
+    }
+
+    int get_precedence_count(const PJSPGraphNode& node) const {
+        if (node->index_in_machine==0) {
+            return (node->index_in_job == problem().get_job(node->job_id).operation_count()-1)?0:1;
+        } else{
+            return (node->index_in_job == problem().get_job(node->job_id).operation_count()-1)?1:2;
+        }
+    }
+
+    int get_successor_count(const PJSPGraphNode& node) const {
+        if (node->index_in_machine==problem().get_machine(node->machine_id).operation_count()-1) {
+            return (node->index_in_job==0)?0:1;
+        } else{
+            return (node->index_in_job==0)?1:2;
+        }
+    }
+
+
+    void set_node_as_next_machine_job(PJSPGraphNode& node) {
+        node->index_in_machine = _machine_operation_orders[node->machine_id].size();
+        _machine_operation_orders[node->machine_id].push_back(node->id);
+    }
+
+    /**
+     * generate a solution using greedy algorithms
+     */
+    void generate_greedy_solution();
 
     /**
      * Draw the graph to the specified image file
@@ -543,7 +538,7 @@ public:
     void recalculate_earliest_times();
 
     double shortest_time() {
-        return _end_node->earliest_end_time;
+        return last_node_time;
     }
 };
 

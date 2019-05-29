@@ -88,43 +88,36 @@ struct PPOperationGreatThan{
 };
 
 JSPSearchGraph::JSPSearchGraph(const JSPProblem& problem):_problem(problem),
-        _operation_node_ids(_problem.operation_count()),_machine_operation_orders(_problem.machine_count()),
-        _start_node(new JSPGraphNode{0, nullptr}),_end_node(new JSPGraphNode{1, nullptr}){
-    _nodes.push_back(_start_node);
-    _nodes.push_back(_end_node);
+        _machine_operation_orders(_problem.machine_count()) {
 
-
-    for (int i=0;i<_problem.job_count();i++) {
-        const Job& job = _problem.get_job(i);
-        PJSPGraphNode prev_node = _start_node;
-        for (int j=0;j<job.operation_count();j++) {
-            const POperation& pop=job.get_operation(j);
+    for (int i = 0; i < _problem.job_count(); i++) {
+        const Job &job = _problem.get_job(i);
+        for (int j = 0; j < job.operation_count(); j++) {
+            const POperation &pop = job.get_operation(j);
             PJSPGraphNode node = create_node(pop);
-            add_vertice(prev_node,node);
-            _operation_node_ids[pop->id()]=node->id;
-            prev_node = node;
+            if (j == 0) {
+                _start_nodes.insert(node->id);
+            } else if (j == job.operation_count() - 1) {
+                _end_nodes.insert(node->id);
+            }
         }
-        add_vertice(prev_node,_end_node);
     }
+}
 
+void JSPSearchGraph::generate_greedy_solution() {
     PPOperationGreatThan great_than{};
     for (int i=0;i<_problem.machine_count();i++) {
         const Machine& machine = _problem.get_machine(i);
         OperationOrdersInMachine& order = _machine_operation_orders[machine.id()];
         std::vector<POperation> operations(machine.opertions().begin(), machine.opertions().end());
         make_heap(operations.begin(),operations.end(),great_than);
-        PJSPGraphNode prev_node = nullptr;
         while(!operations.empty()){
             pop_heap(operations.begin(),operations.end(),great_than);
             POperation  op = operations.back();
-            int node_id = _operation_node_ids[op->id()];
+            int node_id = op->id();
+            PJSPGraphNode& node = _nodes[node_id];
+            set_node_as_next_machine_job(node);
             operations.pop_back();
-            order.push_back(node_id);
-            const PJSPGraphNode& node = _nodes[node_id];
-            if (prev_node !=nullptr) {
-                add_vertice(prev_node,node);
-            }
-            prev_node = node;
         }
     }
 
@@ -140,11 +133,9 @@ void JSPSearchGraph::generate_image(const string& filename) const {
     char node_str[] = "node_";
     char buf[101];
     vector<Agnode_t *> g_nodes{};
-    Agnode_t *g_node;
-    g_node = agnode(g, (char*)"start", TRUE);
-    g_nodes.push_back(g_node);
-    g_node = agnode(g, (char*)"end", TRUE);
-    g_nodes.push_back(g_node);
+    Agnode_t *g_node, *g_start_node, *g_end_node;
+    g_start_node = agnode(g, (char*)"start", TRUE);
+    g_end_node = agnode(g, (char*)"end", TRUE);
     for (int i = 0; i < _problem.job_count(); i++) {
         const Job &job = _problem.get_job(i);
 
@@ -156,23 +147,48 @@ void JSPSearchGraph::generate_image(const string& filename) const {
         agattr(subg, AGRAPH, (char*)"label", buf);
         for (int j = 0; j < job.operation_count(); j++) {
             const POperation& pop = job.get_operation(j);
-            const PJSPGraphNode &node = _nodes[_operation_node_ids[pop->id()]];
-            snprintf(buf, 100, "%s%d(%.1f ES%.1f EF%.1f)", node_str, node->id, node->pop->duration(),node->earliest_start_time,node->earliest_end_time);
+            const PJSPGraphNode &node = _nodes[pop->id()];
+            snprintf(buf, 100, "%s%d(%d ES%d EF%d)", node_str, node->id, node->duration,node->earliest_start_time,node->earliest_end_time);
             g_node = agnode(subg, buf, TRUE);
             g_nodes.push_back(g_node);
         }
     }
 
+
+
     Agnode_t *g_next_node;
-    int count = 0;
+    int j_count,m_count = 0;
+    for (int id:_start_nodes){
+        g_node = g_nodes[id];
+        snprintf(buf, 100, "j_edge_%d", j_count++);
+        agedge(g, g_start_node, g_node, buf, TRUE);
+    }
     for (int i = 0; i < _nodes.size(); i++) {
-        const unordered_set<int> &successors = _nodes[i]->successors;
         g_node = g_nodes[i];
-        for (int next_node_id:successors) {
-            g_next_node = g_nodes[next_node_id];
-            snprintf(buf, 100, "edge_%d", count++);
-            agedge(g, g_node, g_next_node, buf, TRUE);
+        int next_id = get_next_in_job(_nodes[i]);
+        if (next_id==-1) {
+            g_next_node = g_end_node;
+        } else if (next_id>=0) {
+            g_next_node = g_nodes[next_id];
+        } else{
+            throw runtime_error("error next in job node!");
         }
+        snprintf(buf, 100, "j_edge_%d", j_count++);
+        agedge(g, g_node, g_next_node, buf, TRUE);
+
+        next_id = get_next_in_machine(_nodes[i]);
+        if (next_id==-1) {
+            g_next_node = g_end_node;
+        } else if (next_id>=0) {
+            g_next_node = g_nodes[next_id];
+        } else{
+            char buf[100];
+            sprintf(buf,"error next in machine node (id: %d, %d,%d,%d,%d)!",_nodes[i]->id,_nodes[i]->job_id,_nodes[i]->index_in_job,
+                    _nodes[i]->machine_id,_nodes[i]->index_in_machine);
+            throw runtime_error(buf);
+        }
+        snprintf(buf, 100, "m_edge_%d", m_count++);
+        agedge(g, g_node, g_next_node, buf, TRUE);
     }
 
     gvLayout(gvc, g, "dot");
@@ -187,39 +203,62 @@ void JSPSearchGraph::recalculate_earliest_times(){
     queue<int> candidates;
     unordered_set<int> finished;
 
-    for (int id:_start_node->successors) {
+    for (int id:_start_nodes) {
         const PJSPGraphNode& node=_nodes[id];
 
-        if (node->precedences.size()==1){
+        if (get_prev_in_machine(node)==-1){
             candidates.push(node->id);
         } else {
-            uncalculated_precedences[node->id]=node->precedences.size()-1;
+            uncalculated_precedences[node->id]=1;
         }
     }
-    finished.insert(_start_node->id);
 
     while (!candidates.empty()) {
-        const PJSPGraphNode&  current_node=_nodes[candidates.front()];
+        PJSPGraphNode&  current_node=_nodes[candidates.front()];
         candidates.pop();
         current_node->earliest_start_time = 0;
-        for (int id:current_node->precedences) {
-            const PJSPGraphNode& precedent = _nodes[id];
-            if (precedent->earliest_end_time>current_node->earliest_start_time) {
-                current_node->earliest_start_time=precedent->earliest_end_time;
+        int prev_in_job_id = get_prev_in_job(current_node);
+        int prev_in_machine_id = get_prev_in_machine(current_node);
+        if (prev_in_job_id==-1 && prev_in_machine_id==-1) {
+            current_node->earliest_start_time = 0;
+        } else if (prev_in_job_id ==-1 ) {
+            const PJSPGraphNode& precedent_in_machine = _nodes[prev_in_machine_id];
+            current_node->earliest_start_time=precedent_in_machine->earliest_end_time;
+        } else if (prev_in_machine_id==-1) {
+            const PJSPGraphNode& precedent_in_job = _nodes[prev_in_job_id];
+            current_node->earliest_start_time=precedent_in_job->earliest_end_time;
+        } else {
+            const PJSPGraphNode& precedent_in_job = _nodes[prev_in_job_id];
+            const PJSPGraphNode& precedent_in_machine = _nodes[prev_in_machine_id];
+            if (precedent_in_job->earliest_end_time>precedent_in_machine->earliest_start_time) {
+                current_node->earliest_start_time=precedent_in_job->earliest_end_time;
+            } else {
+                current_node->earliest_start_time=precedent_in_machine->earliest_end_time;
             }
         }
         current_node->earliest_end_time = current_node->earliest_start_time+current_node->duration;
-        for (int id:current_node->successors) {
+        int next_in_job_id = get_next_in_job(current_node);
+        int next_in_machine_id = get_next_in_machine(current_node);
+
+        for (int i=0;i<2;i++) {
+            int id;
+            if (i==1) {
+                id = next_in_job_id;
+            } else {
+                id = next_in_machine_id;
+            }
+            if (id<0) {
+                continue;
+            }
             //the node has calculated, skip it
             if (finished.find(id)!=finished.end()) {
                 continue;
             }
-
             auto it=uncalculated_precedences.find(id);
             int n;
             if (it==uncalculated_precedences.end()) {
                 const PJSPGraphNode& successor=_nodes[id];
-                n=successor->precedences.size();
+                n=get_precedence_count(successor);
             } else {
                 n = uncalculated_precedences[id];
             }
@@ -234,6 +273,14 @@ void JSPSearchGraph::recalculate_earliest_times(){
             }
         }
         finished.insert(current_node->id);
+    }
+
+    last_node_time = 0;
+    for (int id:_end_nodes) {
+        const PJSPGraphNode& node = _nodes[id];
+        if (node->earliest_end_time>last_node_time) {
+            last_node_time = node->earliest_end_time;
+        }
     }
 }
 

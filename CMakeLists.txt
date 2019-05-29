@@ -43,5 +43,7 @@ target_include_directories(jsp PUBLIC ${Graphviz_INCLUDE_DIRS})
 # target_compile_options(jsp ${Graphviz_CFLAGS_OTHER})
 
 add_executable(test_read_data src/test_read_data.cpp )
-target_link_libraries(test_read_data jsp)
+target_link_libraries(test_read_data jsp )
+add_executable(global_search src/global_search.cpp )
+target_link_libraries(global_search jsp )
 #add_executable(eigen_test src/eigen_test.cpp)
