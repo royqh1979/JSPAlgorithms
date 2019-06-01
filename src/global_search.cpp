@@ -10,7 +10,7 @@ using namespace std;
 
 int main() {
     // optimum 655
-    JSPProblem problem("e:/test.txt");
+    JSPProblem problem("e:/la02.txt");
 
     problem.print_jobs();
     problem.print_machines();
@@ -100,18 +100,7 @@ int main() {
             //判断是否需要剪枝
 //            if (depth<=5)
 //                cout<<node->earliest_start_time<<"++"<<node->earliest_end_time<<"++"<<known_shortest_time<<endl;
-            int max_last_time = 0;
-            for (int i=0;i<problem.job_count();i++) {
-                if (remain_job_times[i]>max_last_time) {
-                    max_last_time=remain_job_times[i];
-                }
-            }
-            for (int i=0;i<problem.machine_count();i++) {
-                if (remain_machine_times[i]>max_last_time) {
-                    max_last_time=remain_machine_times[i];
-                }
-            }
-//            int max_last_time = remain_job_times[node->job_id]>remain_machine_times[node->machine_id]?remain_job_times[node->job_id]:remain_machine_times[node->machine_id];
+            int max_last_time = remain_job_times[node->job_id]>remain_machine_times[node->machine_id]?remain_job_times[node->job_id]:remain_machine_times[node->machine_id];
             if (node->earliest_end_time+max_last_time>=known_shortest_time) {
                 //剪枝
 //                cout<<problem.operation_count()<<"cut:"<<depth<<","<<node->earliest_end_time+max_last_time<<endl;
