@@ -27,6 +27,8 @@ int main() {
 
     int known_shortest_time = graph.shortest_time();
 
+//    known_shortest_time = 1000;
+
     cout<<known_shortest_time<<endl;
     graph.clear_machine_operation_orders();
 
@@ -35,8 +37,6 @@ int main() {
     vector<int> last_finished_in_jobs{}; // 每个job中已经完成的最后一个operation在job中的序号
     vector<int> step_jobs{}; //每一步选择执行哪个job中的第一个一个未执行operation
     vector<int> current_finish_times{}; //每一步之后当前图的完成时间
-
-    JSPSearchGraph best_graph(problem);
     int count=0;
 
     for (int i=0;i<problem.job_count();i++) {
@@ -48,16 +48,16 @@ int main() {
     step_jobs.push_back(-1);
     while (depth >= 0) {
         int j = (++step_jobs[depth]);
-        if (depth<=5) {
-            cout<<depth<<":";
-            for (int i = 0; i <= depth; i++) {
-                cout << step_jobs[i]<<",";
-            }
-            cout<<endl;
-        }
+//        if (depth<=5) {
+//            cout<<depth<<":";
+//            for (int i = 0; i <= depth; i++) {
+//                cout << step_jobs[i]<<",";
+//            }
+//            cout<<endl;
+//        }
         if (j>=problem.job_count()) {
-            if (depth<=5)
-                cout<<"back"<<endl;
+//            if (depth<=5)
+//                cout<<"back"<<endl;
             //回溯
             step_jobs.pop_back();
             depth--;
@@ -70,8 +70,8 @@ int main() {
             graph.remove_last_node_in_machine_orders(node->machine_id);
             last_finished_in_jobs[j]--;
         } else {
-            if (depth<=5)
-                cout<<last_finished_in_jobs[j]<<"--"<<last_operation_in_jobs[j]<<endl;
+//            if (depth<=5)
+//                cout<<last_finished_in_jobs[j]<<"--"<<last_operation_in_jobs[j]<<endl;
             if (last_finished_in_jobs[j]>=last_operation_in_jobs[j]) {
                 //该job中的operation已全部执行，因此不可行
                 continue;
@@ -82,8 +82,8 @@ int main() {
             graph.set_node_as_next_in_machine_orders(node);
             graph.calc_node_earlist_times(node);
             //判断是否需要剪枝
-            if (depth<=5)
-                cout<<node->earliest_start_time<<"++"<<node->earliest_end_time<<"++"<<known_shortest_time<<endl;
+//            if (depth<=5)
+//                cout<<node->earliest_start_time<<"++"<<node->earliest_end_time<<"++"<<known_shortest_time<<endl;
             if (node->earliest_end_time>=known_shortest_time) {
                 //剪枝
                 graph.remove_last_node_in_machine_orders(node->machine_id);
@@ -97,17 +97,17 @@ int main() {
                 current_finish_times.push_back(finish_time>node->earliest_end_time?finish_time:node->earliest_end_time);
             }
             if (depth==problem.operation_count()-1) {
-                cout<<"found one!"<<current_finish_times.back()<<endl;
-                count++;
-                char buf[100];
-                sprintf(buf,"f:/s%04d.png",count);
-                graph.generate_image(buf);
                 //找到一个新的解
                 //判断是否需要更新最优解
                 if (current_finish_times.back()<known_shortest_time) {
                     known_shortest_time = current_finish_times.back();
-                    best_graph = graph;
+                    cout<<"found one!"<<current_finish_times.back()<<endl;
+                    count++;
+                    char buf[100];
+                    sprintf(buf,"f:/s-%04d.png",known_shortest_time);
+                    graph.generate_image(buf);
                 }
+                graph.remove_last_node_in_machine_orders(node->machine_id);
                 //回溯
                 step_jobs.pop_back();
                 depth--;
@@ -116,6 +116,7 @@ int main() {
                 const POperation&  op = problem.get_operation(j,last_finished_in_jobs[j]);
                 PJSPGraphNode& node = graph.get_node(op->id());
                 graph.remove_last_node_in_machine_orders(node->machine_id);
+                last_finished_in_jobs[j]--;
             } else {
                 //继续下一步
                 last_finished_in_jobs[j]++;
@@ -124,9 +125,6 @@ int main() {
             }
         }
     }
-
-    std::cout<<"best solution:"<<known_shortest_time;
-    best_graph.generate_image("test3.png");
 
     return 0;
 }

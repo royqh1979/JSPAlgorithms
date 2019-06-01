@@ -503,17 +503,17 @@ public:
 
     int get_precedence_count(const PJSPGraphNode& node) const {
         if (node->index_in_machine==0) {
-            return (node->index_in_job == problem().get_job(node->job_id).operation_count()-1)?0:1;
+            return (node->index_in_job == 0)?0:1;
         } else{
-            return (node->index_in_job == problem().get_job(node->job_id).operation_count()-1)?1:2;
+            return (node->index_in_job == 0)?1:2;
         }
     }
 
     int get_successor_count(const PJSPGraphNode& node) const {
         if (node->index_in_machine==problem().get_machine(node->machine_id).operation_count()-1) {
-            return (node->index_in_job==0)?0:1;
+            return (node->index_in_job == problem().get_job(node->job_id).operation_count()-1)?0:1;
         } else{
-            return (node->index_in_job==0)?1:2;
+            return (node->index_in_job == problem().get_job(node->job_id).operation_count()-1)?1:2;
         }
     }
 

@@ -188,17 +188,16 @@ void JSPSearchGraph::generate_image(const string& filename) const {
 
         next_id = get_next_in_machine(_nodes[i]);
         if (next_id==-1) {
-            g_next_node = g_end_node;
         } else if (next_id>=0) {
             g_next_node = g_nodes[next_id];
+            snprintf(buf, 100, "m_edge_%d", m_count++);
+            agedge(g, g_node, g_next_node, buf, TRUE);
         } else{
             char buf[100];
             sprintf(buf,"error next in machine node (id: %d, %d,%d,%d,%d)!",_nodes[i]->id,_nodes[i]->job_id,_nodes[i]->index_in_job,
                     _nodes[i]->machine_id,_nodes[i]->index_in_machine);
             throw runtime_error(buf);
         }
-        snprintf(buf, 100, "m_edge_%d", m_count++);
-        agedge(g, g_node, g_next_node, buf, TRUE);
     }
 
     gvLayout(gvc, g, "dot");
@@ -289,7 +288,7 @@ void JSPSearchGraph::calc_node_earlist_times(PJSPGraphNode &node) {
     } else {
         const PJSPGraphNode &precedent_in_job = _nodes[prev_in_job_id];
         const PJSPGraphNode &precedent_in_machine = _nodes[prev_in_machine_id];
-        if (precedent_in_job->earliest_end_time > precedent_in_machine->earliest_start_time) {
+        if (precedent_in_job->earliest_end_time > precedent_in_machine->earliest_end_time) {
             node->earliest_start_time = precedent_in_job->earliest_end_time;
         } else {
             node->earliest_start_time = precedent_in_machine->earliest_end_time;

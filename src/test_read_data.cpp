@@ -12,8 +12,8 @@ using namespace std;
 int main() {
     JSPProblem problem("e:/test.txt");
 
-   // problem.print_jobs();
-   // problem.print_machines();
+   problem.print_jobs();
+   problem.print_machines();
 
     JSPSearchGraph graph(problem);
 
