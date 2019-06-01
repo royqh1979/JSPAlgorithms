@@ -234,6 +234,7 @@ public:
     friend class JSPProblem;
 };
 
+
 /**
  * The JSP problem class
  * Each jsp problem is corresponding to one JspProblem object.
@@ -412,12 +413,14 @@ using PJSPGraphNode = std::shared_ptr<JSPGraphNode>;
 
 using OperationOrdersInMachine = std::vector<int>;
 
+
+
 /**
  * JSP Search Graph
  */
 class JSPSearchGraph{
 private:
-    const JSPProblem& _problem;
+    const JSPProblem* _problem;
     std::vector<PJSPGraphNode> _nodes{};
     std::unordered_set<int> _start_nodes{};
     std::unordered_set<int> _end_nodes{};
@@ -455,7 +458,7 @@ public:
      * @return
      */
     const JSPProblem& problem() const {
-        return _problem;
+        return *(_problem);
     }
 
     /**
@@ -515,10 +518,30 @@ public:
     }
 
 
-    void set_node_as_next_machine_job(PJSPGraphNode& node) {
+    /**
+     * 将operation结点设置为machine活动关系队列中的下一个
+     * @param node
+     */
+    void set_node_as_next_in_machine_orders(PJSPGraphNode &node) {
         node->index_in_machine = _machine_operation_orders[node->machine_id].size();
         _machine_operation_orders[node->machine_id].push_back(node->id);
     }
+
+    /**
+     * 从machine活动关系队列中移除最后一个operation结点
+     */
+    void remove_last_node_in_machine_orders(int machine_id) {
+        int last_node_id = _machine_operation_orders[machine_id].back();
+        PJSPGraphNode& node = _nodes[last_node_id];
+        node->index_in_machine=-1;
+        _machine_operation_orders[machine_id].pop_back();
+    }
+
+    /**
+     *     清空machine活动关系队列
+     * @return
+     */
+    void clear_machine_operation_orders();
 
     const std::unordered_set<int>& start_nodes() const {
         return _start_nodes;
@@ -544,6 +567,12 @@ public:
     double shortest_time() {
         return last_node_time;
     }
+
+    PJSPGraphNode& get_node(int node_id) {
+        return _nodes[node_id];
+    }
+
+    void calc_node_earlist_times(PJSPGraphNode &node) ;
 };
 
 
