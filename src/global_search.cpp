@@ -5,6 +5,8 @@
  */
 
 #include "jsp.h"
+#include <cstring>
+#include <cstdlib>
 #include <iostream>
 using namespace std;
 
@@ -33,22 +35,22 @@ int main() {
     graph.clear_machine_operation_orders();
 
     cout<<"start!"<<endl;
-    vector<int> last_operation_in_jobs{}; //每个job中最后一个operation的序号
-    vector<int> last_finished_in_jobs{}; // 每个job中已经完成的最后一个operation在job中的序号
-    vector<int> step_jobs{}; //每一步选择执行哪个job中的第一个一个未执行operation
-    vector<int> current_finish_times{}; //每一步之后当前图的完成时间
-    vector<int> remain_machine_times{}; //每个machine剩余任务的总完成时间
-    vector<int> remain_job_times{}; //每个job剩余任务的总完成时间
-
+    int max_depth = problem.operation_count();
+    int last_operation_in_jobs[max_depth]; //每个job中最后一个operation的序号
+    int last_finished_in_jobs[max_depth]; // 每个job中已经完成的最后一个operation在job中的序号
+    int step_jobs[max_depth]; //每一步选择执行哪个job中的第一个一个未执行operation
+    int current_finish_times[max_depth]; //每一步之后当前图的完成时间
+    int remain_machine_times[problem.machine_count()]; //每个machine剩余任务的总完成时间
+    int remain_job_times[problem.job_count()]; //每个job剩余任务的总完成时间
+    int operation_machines[max_depth]; // 每一步处理的operation所用的机器
+    int operation_machines_composite[max_depth][problem.machine_count()]; //每一步处理的operation的机器组合
     int count=0;
 
-    for (int i=0;i<problem.machine_count();i++) {
-        remain_machine_times.push_back(0);
-    }
+    memset(remain_machine_times,0,sizeof(remain_machine_times));
+    memset(remain_job_times,0,sizeof(remain_job_times));
     for (int i=0;i<problem.job_count();i++) {
-        last_operation_in_jobs.push_back(problem.operation_count_in_job(i)-1);
-        last_finished_in_jobs.push_back(-1);
-        remain_job_times.push_back(0);
+        last_operation_in_jobs[i]=problem.operation_count_in_job(i)-1;
+        last_finished_in_jobs[i]=-1;
         for (int j=0;j<problem.operation_count_in_job(i);j++) {
             const POperation &op=problem.get_operation(i,j);
             remain_job_times[i]+=op->duration();
@@ -57,7 +59,8 @@ int main() {
     }
 
     int depth = 0;
-    step_jobs.push_back(-1);
+    step_jobs[depth]=-1;
+    memset(operation_machines_composite[0],0,sizeof(int)*problem.machine_count());
     while (depth >= 0) {
         int j = (++step_jobs[depth]);
 //        if (depth<=5) {
@@ -71,11 +74,9 @@ int main() {
 //            if (depth<=5)
 //                cout<<"back"<<endl;
             //回溯
-            step_jobs.pop_back();
             depth--;
             if (depth<0)
                 break;
-            current_finish_times.pop_back();
             int j=step_jobs[depth];
             const POperation&  op = problem.get_operation(j,last_finished_in_jobs[j]);
             PJSPGraphNode& node = graph.get_node(op->id());
@@ -93,6 +94,10 @@ int main() {
             //计算活动时间
             const POperation&  op = problem.get_operation(j,last_finished_in_jobs[j]+1);
             PJSPGraphNode& node = graph.get_node(op->id());
+            if (depth>0 && (operation_machines_composite[depth][node->machine_id]==0) && (node->machine_id<operation_machines[depth-1])) {
+                //与本活动组合相同的组合之前已经尝试过，跳过
+                continue;
+            }
             graph.set_node_as_next_in_machine_orders(node);
             remain_job_times[node->job_id]-=node->duration;
             remain_machine_times[node->machine_id]-=node->duration;
@@ -111,17 +116,17 @@ int main() {
             }
             //记录时间
             if (depth==0) {
-                current_finish_times.push_back(node->earliest_end_time);
+                current_finish_times[depth]=node->earliest_end_time;
             }else {
-                int finish_time = current_finish_times.back();
-                current_finish_times.push_back(finish_time>node->earliest_end_time?finish_time:node->earliest_end_time);
+                int finish_time = current_finish_times[depth-1];
+                current_finish_times[depth]=finish_time>node->earliest_end_time?finish_time:node->earliest_end_time;
             }
             if (depth==problem.operation_count()-1) {
                 //找到一个新的解
                 //判断是否需要更新最优解
-                if (current_finish_times.back()<known_shortest_time) {
-                    known_shortest_time = current_finish_times.back();
-                    cout<<"found one!"<<current_finish_times.back()<<endl;
+                if (current_finish_times[depth]<known_shortest_time) {
+                    known_shortest_time = current_finish_times[depth];
+                    cout<<"found one!"<<current_finish_times[depth]<<endl;
                     count++;
                     char buf[100];
                     sprintf(buf,"f:/s-%04d.png",known_shortest_time);
@@ -131,9 +136,7 @@ int main() {
                 remain_job_times[node->job_id]+=node->duration;
                 remain_machine_times[node->machine_id]+=node->duration;
                 //回溯
-                step_jobs.pop_back();
                 depth--;
-                current_finish_times.pop_back();
                 int j=step_jobs[depth];
                 const POperation&  op = problem.get_operation(j,last_finished_in_jobs[j]);
                 PJSPGraphNode& node = graph.get_node(op->id());
@@ -143,9 +146,26 @@ int main() {
                 last_finished_in_jobs[j]--;
             } else {
                 //继续下一步
+                operation_machines[depth]=node->machine_id;
+                if (depth>0) {
+                    if (operation_machines_composite[depth - 1][depth] == 0) {
+                        memcpy(operation_machines_composite[depth], operation_machines_composite[depth-1],sizeof(int)*problem.machine_count());
+                    } else {
+                        memset(operation_machines_composite[depth], 0,sizeof(int)*problem.machine_count());
+                        for (int i=depth-1;i>=0;i++) {
+                            if (operation_machines[i]==node->machine_id) {
+                                break;
+                            }
+                            operation_machines_composite[depth][i]=1;
+                        }
+                    }
+                } else {
+                    memset(operation_machines_composite[depth], 0,sizeof(int)*problem.machine_count());
+                }
+                operation_machines_composite[depth][node->machine_id] = 1;
                 last_finished_in_jobs[j]++;
                 depth++;
-                step_jobs.push_back(-1);
+                step_jobs[depth]=-1;
             }
         }
     }
